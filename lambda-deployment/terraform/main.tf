@@ -12,14 +12,13 @@ terraform {
     }
   }
 
-  # Backend configuration for state storage
-  # Uncomment and configure if you want remote state
-  # backend "s3" {
-  #   bucket         = "your-terraform-state-bucket"
-  #   key            = "github-issue-extractor/terraform.tfstate"
-  #   region         = "ap-southeast-2"
-  #   encrypt        = true
-  # }
+  # S3 backend for persistent state across CI/CD runs
+  backend "s3" {
+    bucket  = "github-api-extraction-bucket"
+    key     = "terraform/github-issue-extractor.tfstate"
+    region  = "ap-southeast-2"
+    encrypt = true
+  }
 }
 
 provider "aws" {

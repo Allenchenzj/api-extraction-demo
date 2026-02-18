@@ -97,11 +97,24 @@ jobs:
 
       - name: Terraform Init
         working-directory: ${{ env.WORKING_DIRECTORY }}/terraform
-        run: terraform init
+        run: terraform init -reconfigure
 
       - name: Terraform Validate
         working-directory: ${{ env.WORKING_DIRECTORY }}/terraform
         run: terraform validate
+
+      - name: Import Existing Resources
+        working-directory: ${{ env.WORKING_DIRECTORY }}/terraform
+        continue-on-error: true
+        run: |
+          # Import existing resources if they exist (first-time setup)
+          # These will fail silently if resources don't exist
+          terraform import aws_iam_role.lambda_role github-issue-extractor-lambda-role 2>/dev/null || true
+          terraform import 'aws_iam_role_policy.lambda_logs' 'github-issue-extractor-lambda-role:lambda-cloudwatch-logs' 2>/dev/null || true
+          terraform import 'aws_iam_role_policy.lambda_s3' 'github-issue-extractor-lambda-role:lambda-s3-access' 2>/dev/null || true
+          terraform import 'aws_iam_role_policy.lambda_secrets' 'github-issue-extractor-lambda-role:lambda-secrets-access' 2>/dev/null || true
+          terraform import aws_cloudwatch_log_group.lambda_logs /aws/lambda/github-issue-extractor 2>/dev/null || true
+          terraform import aws_lambda_function.github_issue_extractor github-issue-extractor 2>/dev/null || true
 
       - name: Terraform Plan
         working-directory: ${{ env.WORKING_DIRECTORY }}/terraform
