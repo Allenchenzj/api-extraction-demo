@@ -60,3 +60,24 @@ resource "aws_iam_role_policy" "lambda_s3" {
     ]
   })
 }
+
+# Secrets Manager access policy for GitHub token
+resource "aws_iam_role_policy" "lambda_secrets" {
+  name = "lambda-secrets-access"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = [
+          "arn:aws:secretsmanager:${var.aws_region}:*:secret:${var.github_token_secret_name}*"
+        ]
+      }
+    ]
+  })
+}

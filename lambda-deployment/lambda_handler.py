@@ -5,10 +5,54 @@ This is the entry point for the Lambda function.
 It imports and uses the GitHubIssueExtractor class.
 """
 
+import json
 import os
 from typing import Any, Dict
 
+import boto3
+from botocore.exceptions import ClientError
+
 from github_issue_extractor import GitHubIssueExtractor
+
+
+def get_secret(secret_name: str, region_name: str = None) -> str:
+    """
+    Retrieve secret value from AWS Secrets Manager.
+
+    Args:
+        secret_name: Name of the secret in Secrets Manager
+        region_name: AWS region (defaults to AWS_REGION env var)
+
+    Returns:
+        Secret string value
+
+    Raises:
+        Exception: If secret cannot be retrieved
+    """
+    region = region_name or os.getenv("AWS_REGION", "ap-southeast-2")
+    client = boto3.client("secretsmanager", region_name=region)
+
+    try:
+        response = client.get_secret_value(SecretId=secret_name)
+        # Handle both string and binary secrets
+        if "SecretString" in response:
+            secret = response["SecretString"]
+            # Try to parse as JSON (common pattern)
+            try:
+                secret_dict = json.loads(secret)
+                # If it's a dict, return the token value or the whole secret
+                if isinstance(secret_dict, dict):
+                    return secret_dict.get(
+                        "token", secret_dict.get("GITHUB_TOKEN", secret)
+                    )
+            except json.JSONDecodeError:
+                return secret
+            return secret
+        else:
+            return response["SecretBinary"].decode("utf-8")
+    except ClientError as e:
+        print(f"Error retrieving secret {secret_name}: {e}")
+        raise
 
 
 def get_config_from_env() -> Dict[str, str]:
@@ -18,8 +62,19 @@ def get_config_from_env() -> Dict[str, str]:
     Returns:
         Dictionary with configuration values
     """
+    # Get GitHub token from Secrets Manager
+    secret_name = os.getenv("GITHUB_TOKEN_SECRET_NAME", "github/api-token")
+    github_token = ""
+
+    try:
+        github_token = get_secret(secret_name)
+    except Exception as e:
+        print(f"Warning: Could not retrieve GitHub token from Secrets Manager: {e}")
+        # Fallback to environment variable for local testing
+        github_token = os.getenv("GITHUB_TOKEN", "")
+
     return {
-        "github_token": os.getenv("GITHUB_TOKEN", ""),
+        "github_token": github_token,
         "s3_bucket": os.getenv("S3_BUCKET", "github-api-extraction-bucket"),
         "repo_owner": os.getenv("REPO_OWNER", "pandas-dev"),
         "repo_name": os.getenv("REPO_NAME", "pandas"),
@@ -56,7 +111,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     if not config["github_token"]:
         return {
             "statusCode": 500,
-            "body": "Error: GITHUB_TOKEN environment variable not set.",
+            "body": "Error: Could not retrieve GITHUB_TOKEN from Secrets Manager.",
         }
 
     try:

@@ -105,12 +105,7 @@ jobs:
 
       - name: Terraform Plan
         working-directory: ${{ env.WORKING_DIRECTORY }}/terraform
-        run: |
-          terraform plan \
-            -var="github_token=${{ secrets.GITHUB_API_TOKEN }}" \
-            -out=tfplan
-        env:
-          TF_VAR_github_token: ${{ secrets.GITHUB_API_TOKEN }}
+        run: terraform plan -out=tfplan
 
       - name: Terraform Apply
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
@@ -120,10 +115,7 @@ jobs:
       - name: Terraform Destroy
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
         working-directory: ${{ env.WORKING_DIRECTORY }}/terraform
-        run: |
-          terraform destroy \
-            -var="github_token=${{ secrets.GITHUB_API_TOKEN }}" \
-            -auto-approve
+        run: terraform destroy -auto-approve
 
       - name: Output Lambda Info
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')

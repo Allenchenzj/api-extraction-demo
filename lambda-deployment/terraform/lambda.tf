@@ -32,10 +32,10 @@ resource "aws_lambda_function" "github_issue_extractor" {
 
   environment {
     variables = {
-      GITHUB_TOKEN = var.github_token
-      S3_BUCKET    = var.s3_bucket
-      REPO_OWNER   = var.repo_owner
-      REPO_NAME    = var.repo_name
+      GITHUB_TOKEN_SECRET_NAME = var.github_token_secret_name
+      S3_BUCKET                = var.s3_bucket
+      REPO_OWNER               = var.repo_owner
+      REPO_NAME                = var.repo_name
     }
   }
 

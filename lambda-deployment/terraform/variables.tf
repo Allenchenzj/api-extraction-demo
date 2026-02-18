@@ -10,10 +10,10 @@ variable "environment" {
   default     = "prod"
 }
 
-variable "github_token" {
-  description = "GitHub Personal Access Token for API access"
+variable "github_token_secret_name" {
+  description = "Name of the AWS Secrets Manager secret containing GitHub token"
   type        = string
-  sensitive   = true
+  default     = "github/api-token"
 }
 
 variable "s3_bucket" {
