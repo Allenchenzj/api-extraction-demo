@@ -5,12 +5,21 @@ data "archive_file" "lambda_zip" {
   output_path = "${path.module}/../lambda_function.zip"
 }
 
+# Upload Lambda zip to S3 (required for packages > 50MB)
+resource "aws_s3_object" "lambda_zip" {
+  bucket = var.s3_bucket
+  key    = "lambda-deployments/github-issue-extractor.zip"
+  source = data.archive_file.lambda_zip.output_path
+  etag   = data.archive_file.lambda_zip.output_md5
+}
+
 # Lambda function
 resource "aws_lambda_function" "github_issue_extractor" {
   function_name = "github-issue-extractor"
   description   = "Extracts GitHub issues from repository and stores in S3"
 
-  filename         = data.archive_file.lambda_zip.output_path
+  s3_bucket        = var.s3_bucket
+  s3_key           = aws_s3_object.lambda_zip.key
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
   handler = "lambda_handler.lambda_handler"
@@ -33,6 +42,8 @@ resource "aws_lambda_function" "github_issue_extractor" {
   tags = {
     Name = "github-issue-extractor"
   }
+
+  depends_on = [aws_s3_object.lambda_zip]
 }
 
 # CloudWatch Log Group with retention

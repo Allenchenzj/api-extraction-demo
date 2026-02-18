@@ -65,20 +65,29 @@ jobs:
           # Create package directory
           mkdir -p lambda-deployment/lambda_package
 
-          # Export dependencies from pyproject.toml (exclude dev deps)
-          uv export --no-dev --no-hashes -o lambda-deployment/lambda_package/requirements.txt
+          # Install only necessary dependencies (slim install)
+          pip install requests pandas boto3 -t lambda-deployment/lambda_package/ --no-cache-dir
 
-          # Install dependencies to package directory
-          pip install -r lambda-deployment/lambda_package/requirements.txt -t lambda-deployment/lambda_package/ --no-deps
-
-          # Install core dependencies (requests, pandas, boto3) with their deps
-          pip install requests pandas boto3 -t lambda-deployment/lambda_package/
+          # Remove unnecessary files to reduce package size
+          cd lambda-deployment/lambda_package
+          find . -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+          find . -name "*.pyc" -delete 2>/dev/null || true
+          find . -name "*.pyo" -delete 2>/dev/null || true
+          find . -name "*.so" -type f | xargs strip --strip-unneeded 2>/dev/null || true
+          rm -rf botocore/data/*/examples*.json 2>/dev/null || true
+          cd ../..
 
           # Copy Lambda function code (handler + extractor class)
           cp lambda-deployment/lambda_handler.py lambda-deployment/lambda_package/
           cp lambda-deployment/github_issue_extractor.py lambda-deployment/lambda_package/
 
-          echo "Lambda package contents:"
+          echo "Lambda package size:"
+          du -sh lambda-deployment/lambda_package/
+          echo "Lambda package contents (top level):"
           ls -la lambda-deployment/lambda_package/
 
       - name: Setup Terraform
