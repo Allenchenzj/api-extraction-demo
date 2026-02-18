@@ -1,0 +1,20 @@
+# AWS Region
+aws_region = "ap-southeast-2"
+
+# Environment
+environment = "prod"
+
+# GitHub Token - NEVER commit real values!
+# Set via CI/CD secrets or terraform.tfvars (gitignored)
+# github_token = "ghp_xxxxxxxxxxxxxxxxxxxx"
+
+# S3 bucket for data storage (must already exist)
+s3_bucket = "github-api-extraction-bucket"
+
+# Target GitHub repository
+repo_owner = "pandas-dev"
+repo_name = "pandas"
+
+# Lambda configuration
+lambda_timeout = 300  # 5 minutes
+lambda_memory = 512   # MB

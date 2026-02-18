@@ -1,0 +1,28 @@
+.env
+.venv
+.pytest_cache/
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+tfplan
+*.tfvars
+!*.tfvars.example
+
+# Lambda packaging
+lambda_package/
+lambda_function.zip
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp

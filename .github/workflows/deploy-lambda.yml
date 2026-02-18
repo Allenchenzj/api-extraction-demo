@@ -1,0 +1,129 @@
+name: Deploy GitHub Issue Extractor Lambda
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "lambda-deployment/**"
+      - ".github/workflows/deploy-lambda.yml"
+      - "pyproject.toml"
+      - "uv.lock"
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Terraform action to perform"
+        required: true
+        default: "apply"
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+permissions:
+  id-token: write # Required for OIDC
+  contents: read
+
+env:
+  AWS_REGION: ap-southeast-2
+  WORKING_DIRECTORY: lambda-deployment
+
+jobs:
+  deploy:
+    name: Deploy Lambda Function
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::471112945220:role/github-actions-cicd-role
+          role-session-name: github-actions-lambda-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Package Lambda function
+        working-directory: ${{ github.workspace }}
+        run: |
+          # Create package directory
+          mkdir -p lambda-deployment/lambda_package
+
+          # Export dependencies from pyproject.toml (exclude dev deps)
+          uv export --no-dev --no-hashes -o lambda-deployment/lambda_package/requirements.txt
+
+          # Install dependencies to package directory
+          pip install -r lambda-deployment/lambda_package/requirements.txt -t lambda-deployment/lambda_package/ --no-deps
+
+          # Install core dependencies (requests, pandas, boto3) with their deps
+          pip install requests pandas boto3 -t lambda-deployment/lambda_package/
+
+          # Copy Lambda function code (handler + extractor class)
+          cp lambda-deployment/lambda_handler.py lambda-deployment/lambda_package/
+          cp lambda-deployment/github_issue_extractor.py lambda-deployment/lambda_package/
+
+          echo "Lambda package contents:"
+          ls -la lambda-deployment/lambda_package/
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.0"
+
+      - name: Terraform Init
+        working-directory: ${{ env.WORKING_DIRECTORY }}/terraform
+        run: terraform init
+
+      - name: Terraform Validate
+        working-directory: ${{ env.WORKING_DIRECTORY }}/terraform
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: ${{ env.WORKING_DIRECTORY }}/terraform
+        run: |
+          terraform plan \
+            -var="github_token=${{ secrets.GITHUB_API_TOKEN }}" \
+            -out=tfplan
+        env:
+          TF_VAR_github_token: ${{ secrets.GITHUB_API_TOKEN }}
+
+      - name: Terraform Apply
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+        working-directory: ${{ env.WORKING_DIRECTORY }}/terraform
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Destroy
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+        working-directory: ${{ env.WORKING_DIRECTORY }}/terraform
+        run: |
+          terraform destroy \
+            -var="github_token=${{ secrets.GITHUB_API_TOKEN }}" \
+            -auto-approve
+
+      - name: Output Lambda Info
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+        working-directory: ${{ env.WORKING_DIRECTORY }}/terraform
+        run: |
+          echo "### Lambda Deployment Complete :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+          echo "| Function Name | $(terraform output -raw lambda_function_name) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Function ARN | $(terraform output -raw lambda_function_arn) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Log Group | $(terraform output -raw cloudwatch_log_group) |" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,29 @@
+[project]
+name = "api-extraction-demo"
+version = "0.1.0"
+description = "API extraction demos including GitHub issue extractor Lambda"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "python-dotenv>=1.0.1",
+    "requests>=2.32.0",
+    "tenacity>=8.2.2",
+    "pandas>=2.0.0",
+    "boto3>=1.26.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "flake8>=6.0.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["lambda-deployment/tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v"
